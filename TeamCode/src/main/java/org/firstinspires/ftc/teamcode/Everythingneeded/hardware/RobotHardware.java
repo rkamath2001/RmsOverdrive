@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.team1234.hardware;
+package org.firstinspires.ftc.teamcode.Everythingneeded.hardware;
 
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.lynx.LynxModule;
@@ -9,7 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 
-import org.firstinspires.ftc.teamcode.team1234.config.Constants;
+import org.firstinspires.ftc.teamcode.Everythingneeded.config.Constants;
 
 import java.util.List;
 
@@ -22,9 +22,6 @@ import java.util.List;
  * once at the top of every loop cycle or encoder readings will go stale.
  */
 public class RobotHardware {
-
-    /** Default configuration name of the Control Hub's built-in IMU. */
-    private static final String IMU_NAME = "imu";
 
     public List<LynxModule> allHubs;
 
@@ -62,6 +59,11 @@ public class RobotHardware {
         pollenMotor = hwMap.get(DcMotorEx.class, Constants.POLLEN_MOTOR);
         nectarMotor = hwMap.get(DcMotorEx.class, Constants.NECTAR_MOTOR);
 
+        pollenMotor.setDirection(Constants.POLLEN_REVERSED
+                ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
+        nectarMotor.setDirection(Constants.NECTAR_REVERSED
+                ? DcMotorSimple.Direction.REVERSE : DcMotorSimple.Direction.FORWARD);
+
         pollenMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         nectarMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
@@ -75,7 +77,7 @@ public class RobotHardware {
         limelight = hwMap.get(Limelight3A.class, Constants.LIMELIGHT_NAME);
 
         // IMU
-        imu = hwMap.get(IMU.class, IMU_NAME);
+        imu = hwMap.get(IMU.class, Constants.IMU_NAME);
         // Match these to how the Control Hub is mounted on the robot.
         imu.initialize(new IMU.Parameters(new RevHubOrientationOnRobot(
                 RevHubOrientationOnRobot.LogoFacingDirection.UP,

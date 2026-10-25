@@ -1,11 +1,11 @@
-package org.firstinspires.ftc.teamcode.team1234.opmodes.auto;
+package org.firstinspires.ftc.teamcode.Everythingneeded.opmodes.auto;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
-import org.firstinspires.ftc.teamcode.team1234.config.TuningConstants;
-import org.firstinspires.ftc.teamcode.team1234.control.PIDFController;
-import org.firstinspires.ftc.teamcode.team1234.hardware.RobotHardware;
-import org.firstinspires.ftc.teamcode.team1234.subsystems.*;
+import org.firstinspires.ftc.teamcode.Everythingneeded.config.TuningConstants;
+import org.firstinspires.ftc.teamcode.Everythingneeded.control.PIDFController;
+import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotHardware;
+import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.*;
 
 /**
  * Abstract base class for all 30-second autonomous routines. Provides lifecycle

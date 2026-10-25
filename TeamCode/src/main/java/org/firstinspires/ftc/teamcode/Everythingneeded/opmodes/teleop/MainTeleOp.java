@@ -1,18 +1,16 @@
-package org.firstinspires.ftc.teamcode.team1234.opmodes.teleop;
+package org.firstinspires.ftc.teamcode.Everythingneeded.opmodes.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
-import org.firstinspires.ftc.teamcode.team1234.config.TuningConstants;
-import org.firstinspires.ftc.teamcode.team1234.control.PIDFController;
-import org.firstinspires.ftc.teamcode.team1234.hardware.RobotHardware;
-import org.firstinspires.ftc.teamcode.team1234.subsystems.DriveTrain;
-import org.firstinspires.ftc.teamcode.team1234.subsystems.Intake;
-import org.firstinspires.ftc.teamcode.team1234.subsystems.LimelightVision;
-import org.firstinspires.ftc.teamcode.team1234.subsystems.Pollen;
+import org.firstinspires.ftc.teamcode.Everythingneeded.config.*;
+import org.firstinspires.ftc.teamcode.Everythingneeded.control.PIDFController;
+import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotHardware;
+import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotTelemetry;
+import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.*;
 
 /**
- * Fall TeleOp.
+ * Primary driver-controlled routine.
  *
  * Gamepad 1: left stick translates (field-centric), right stick turns,
  *            right bumper aims at the Limelight target, start resets heading.
@@ -20,11 +18,8 @@ import org.firstinspires.ftc.teamcode.team1234.subsystems.Pollen;
  *            trigger spins them counter-clockwise; right bumper spins the intake clockwise, right trigger
  *            spins it counter-clockwise.
  */
-@TeleOp(name = "Fall TeleOp", group = "Competition")
-public class FallTeleOp extends OpMode {
-
-    /** Trigger travel needed before the intake responds. */
-    private static final double TRIGGER_THRESHOLD = 0.1;
+@TeleOp(name = "Main TeleOp 1234", group = "Competition")
+public class MainTeleOp extends OpMode {
 
     private RobotHardware robot;
     private DriveTrain drive;
@@ -32,6 +27,8 @@ public class FallTeleOp extends OpMode {
     private LimelightVision limelight;
     private Intake intake;
     private PIDFController visionAimController;
+
+    private long lastLoopNanos = 0L;
 
     @Override
     public void init() {
@@ -52,16 +49,20 @@ public class FallTeleOp extends OpMode {
 
     @Override
     public void loop() {
+        // Bulk cache
         robot.clearBulkCache();
+
+        // Limelight sensor update
         limelight.update();
 
+        // Pick up any vision gains edited live on FTC Dashboard.
         visionAimController.setGains(
                 TuningConstants.VISION_ALIGN_KP,
                 TuningConstants.VISION_ALIGN_KI,
                 TuningConstants.VISION_ALIGN_KD,
                 0.0);
 
-        // Turn: aim assist while right bumper is held with a target in view.
+        // Turn calculation
         boolean targetLocked = gamepad1.right_bumper && limelight.hasValidTarget();
         double turnPower;
         if (targetLocked) {
@@ -71,6 +72,7 @@ public class FallTeleOp extends OpMode {
             turnPower = gamepad1.right_stick_x;
         }
 
+        // Chassis driving
         drive.driveFieldCentric(-gamepad1.left_stick_y, gamepad1.left_stick_x, turnPower);
         if (gamepad1.start) {
             drive.resetHeading();
@@ -79,7 +81,7 @@ public class FallTeleOp extends OpMode {
         // Pollen + nectar: left bumper = clockwise, left trigger = counter-clockwise
         if (gamepad2.left_bumper) {
             pollen.clockwise();
-        } else if (gamepad2.left_trigger > TRIGGER_THRESHOLD) {
+        } else if (gamepad2.left_trigger > Constants.TRIGGER_THRESHOLD) {
             pollen.counterClockwise();
         } else {
             pollen.stop();
@@ -88,14 +90,30 @@ public class FallTeleOp extends OpMode {
         // Intake: right bumper = clockwise, right trigger = counter-clockwise
         if (gamepad2.right_bumper) {
             intake.clockwise();
-        } else if (gamepad2.right_trigger > TRIGGER_THRESHOLD) {
+        } else if (gamepad2.right_trigger > Constants.TRIGGER_THRESHOLD) {
             intake.counterClockwise();
         } else {
             intake.stop();
         }
 
-        telemetry.addData("Target lock", targetLocked ? "LOCKED" : "off");
-        telemetry.addData("Pollen power", robot.pollenMotor.getPower());
-        telemetry.addData("Nectar power", robot.nectarMotor.getPower());
+        // Telemetry
+        long now = System.nanoTime();
+        double loopMillis = lastLoopNanos == 0L ? 0.0 : (now - lastLoopNanos) / 1.0e6;
+        lastLoopNanos = now;
+
+        String lockState;
+        if (targetLocked) {
+            lockState = "LOCKED";
+        } else if (limelight.hasValidTarget()) {
+            lockState = "target visible";
+        } else {
+            lockState = "no target";
+        }
+
+        telemetry.addData("Loop time (ms)", "%.1f", loopMillis);
+        telemetry.addData("Target lock", lockState);
+        RobotTelemetry.addMechanisms(telemetry, robot);
+        RobotTelemetry.addDrive(telemetry, robot, drive);
+        RobotTelemetry.addVision(telemetry, limelight);
     }
 }

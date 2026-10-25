@@ -1,10 +1,10 @@
-package org.firstinspires.ftc.teamcode.team1234.subsystems;
+package org.firstinspires.ftc.teamcode.Everythingneeded.subsystems;
 
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
-import org.firstinspires.ftc.teamcode.team1234.hardware.RobotHardware;
+import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotHardware;
 
 /**
  * Mecanum drive controller supporting robot-centric and field-centric kinematics
@@ -16,7 +16,7 @@ import org.firstinspires.ftc.teamcode.team1234.hardware.RobotHardware;
 public class DriveTrain {
 
     private final RobotHardware robot;
-    private boolean fieldCentric = true;
+    private boolean isFieldCentric = true;
 
     public DriveTrain(RobotHardware robot) {
         this.robot = robot;
@@ -26,7 +26,7 @@ public class DriveTrain {
      * Drives in whichever mode is currently selected by the fieldCentric flag.
      */
     public void drive(double forward, double strafe, double turn) {
-        if (fieldCentric) {
+        if (isFieldCentric) {
             driveFieldCentric(forward, strafe, turn);
         } else {
             driveRobotCentric(forward, strafe, turn);
@@ -71,16 +71,21 @@ public class DriveTrain {
         driveRobotCentric(rotatedForward, rotatedStrafe, turn);
     }
 
+    /** Current IMU heading in degrees. */
+    public double getHeadingDegrees() {
+        return robot.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
+    }
+
     public void resetHeading() {
         robot.imu.resetYaw();
     }
 
     public void setFieldCentric(boolean fieldCentric) {
-        this.fieldCentric = fieldCentric;
+        this.isFieldCentric = fieldCentric;
     }
 
     public boolean isFieldCentric() {
-        return fieldCentric;
+        return isFieldCentric;
     }
 
     private static void setPower(DcMotorEx motor, double power) {
