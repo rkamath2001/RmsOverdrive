@@ -4,7 +4,6 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Everythingneeded.config.*;
-import org.firstinspires.ftc.teamcode.Everythingneeded.control.PIDFController;
 import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotHardware;
 import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotTelemetry;
 import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.*;
@@ -12,8 +11,7 @@ import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.*;
 /**
  * Primary driver-controlled routine.
  *
- * Gamepad 1: left stick translates (field-centric), right stick turns,
- *            right bumper aims at the Limelight target, start resets heading.
+ * Gamepad 1: left stick drives and strafes (robot-centric), right stick turns.
  * Gamepad 2: left bumper spins the pollen and nectar motors clockwise, left
  *            trigger spins them counter-clockwise; right bumper spins the intake clockwise, right trigger
  *            spins it counter-clockwise.
@@ -26,9 +24,9 @@ public class MainTeleOp extends OpMode {
     private Pollen pollen;
     private LimelightVision limelight;
     private Intake intake;
-    private PIDFController visionAimController;
 
     private long lastLoopNanos = 0L;
+    private boolean lastDpadRight, lastDpadLeft;
 
     @Override
     public void init() {
@@ -37,14 +35,10 @@ public class MainTeleOp extends OpMode {
 
         drive = new DriveTrain(robot);
         pollen = new Pollen(robot);
+        pollen.setSingleMotorMode(true);
+        pollen.lockPollenPower(1.0);
         limelight = new LimelightVision(robot);
         intake = new Intake(robot);
-
-        visionAimController = new PIDFController(
-                TuningConstants.VISION_ALIGN_KP,
-                TuningConstants.VISION_ALIGN_KI,
-                TuningConstants.VISION_ALIGN_KD,
-                0.0);
     }
 
     @Override
@@ -55,30 +49,19 @@ public class MainTeleOp extends OpMode {
         // Limelight sensor update
         limelight.update();
 
-        // Pick up any vision gains edited live on FTC Dashboard.
-        visionAimController.setGains(
-                TuningConstants.VISION_ALIGN_KP,
-                TuningConstants.VISION_ALIGN_KI,
-                TuningConstants.VISION_ALIGN_KD,
-                0.0);
+        // Chassis driving: left stick drives/strafes, right stick turns.
+        // Robot-centric (no IMU).
+        drive.driveSticks(-gamepad1.left_stick_y, gamepad1.left_stick_x,
+                DriveTrain.shapeTurn(gamepad1.right_stick_x));
 
-        // Turn calculation
-        boolean targetLocked = gamepad1.right_bumper && limelight.hasValidTarget();
-        double turnPower;
-        if (targetLocked) {
-            turnPower = visionAimController.calculate(limelight.getTx(), 0.0);
-        } else {
-            visionAimController.reset();
-            turnPower = gamepad1.right_stick_x;
+        // Dpad left/right switches between pollen and nectar (only the selected one runs).
+        if ((gamepad2.dpad_right && !lastDpadRight) || (gamepad2.dpad_left && !lastDpadLeft)) {
+            pollen.toggleSelected();
         }
+        lastDpadRight = gamepad2.dpad_right;
+        lastDpadLeft = gamepad2.dpad_left;
 
-        // Chassis driving
-        drive.driveFieldCentric(-gamepad1.left_stick_y, gamepad1.left_stick_x, turnPower);
-        if (gamepad1.start) {
-            drive.resetHeading();
-        }
-
-        // Pollen + nectar: left bumper = clockwise, left trigger = counter-clockwise
+        // Left bumper = clockwise, left trigger = counter-clockwise. Limelight never affects power.
         if (gamepad2.left_bumper) {
             pollen.clockwise();
         } else if (gamepad2.left_trigger > Constants.TRIGGER_THRESHOLD) {
@@ -102,9 +85,7 @@ public class MainTeleOp extends OpMode {
         lastLoopNanos = now;
 
         String lockState;
-        if (targetLocked) {
-            lockState = "LOCKED";
-        } else if (limelight.hasValidTarget()) {
+        if (limelight.hasValidTarget()) {
             lockState = "target visible";
         } else {
             lockState = "no target";

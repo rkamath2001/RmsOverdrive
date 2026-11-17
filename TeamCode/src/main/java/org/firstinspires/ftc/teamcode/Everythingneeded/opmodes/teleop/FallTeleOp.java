@@ -4,20 +4,18 @@ import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.Everythingneeded.config.Constants;
-import org.firstinspires.ftc.teamcode.Everythingneeded.config.TuningConstants;
-import org.firstinspires.ftc.teamcode.Everythingneeded.control.PIDFController;
 import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotHardware;
 import org.firstinspires.ftc.teamcode.Everythingneeded.hardware.RobotTelemetry;
 import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.DriveTrain;
 import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.Intake;
 import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.LimelightVision;
 import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.Pollen;
+import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.ServoDoor;
 
 /**
  * Fall TeleOp.
  *
- * Gamepad 1: left stick translates (field-centric), right stick turns,
- *            right bumper aims at the Limelight target, start resets heading.
+ * Gamepad 1: left stick translates (robot-centric), right stick turns.
  * Gamepad 2: left bumper spins the pollen and nectar motors clockwise, left
  *            trigger spins them counter-clockwise; right bumper spins the intake clockwise, right trigger
  *            spins it counter-clockwise.
@@ -32,7 +30,8 @@ public class FallTeleOp extends OpMode {
     private Pollen pollen;
     private LimelightVision limelight;
     private Intake intake;
-    private PIDFController visionAimController;
+    private ServoDoor servoDoor;
+    private boolean lastX, lastY;
 
     @Override
     public void init() {
@@ -41,14 +40,10 @@ public class FallTeleOp extends OpMode {
 
         drive = new DriveTrain(robot);
         pollen = new Pollen(robot);
+        pollen.setSingleMotorMode(true);
         limelight = new LimelightVision(robot);
         intake = new Intake(robot);
-
-        visionAimController = new PIDFController(
-                TuningConstants.VISION_ALIGN_KP,
-                TuningConstants.VISION_ALIGN_KI,
-                TuningConstants.VISION_ALIGN_KD,
-                0.0);
+        servoDoor = new ServoDoor(robot);
     }
 
     @Override
@@ -56,26 +51,8 @@ public class FallTeleOp extends OpMode {
         robot.clearBulkCache();
         limelight.update();
 
-        visionAimController.setGains(
-                TuningConstants.VISION_ALIGN_KP,
-                TuningConstants.VISION_ALIGN_KI,
-                TuningConstants.VISION_ALIGN_KD,
-                0.0);
-
-        // Turn: aim assist while right bumper is held with a target in view.
-        boolean targetLocked = gamepad1.right_bumper && limelight.hasValidTarget();
-        double turnPower;
-        if (targetLocked) {
-            turnPower = visionAimController.calculate(limelight.getTx(), 0.0);
-        } else {
-            visionAimController.reset();
-            turnPower = gamepad1.right_stick_x;
-        }
-
-        drive.driveFieldCentric(-gamepad1.left_stick_y, gamepad1.left_stick_x, turnPower);
-        if (gamepad1.start) {
-            drive.resetHeading();
-        }
+        drive.driveSticks(-gamepad1.left_stick_y, gamepad1.left_stick_x,
+                DriveTrain.shapeTurn(gamepad1.right_stick_x));
 
         adjustOutakePower();
 
@@ -86,9 +63,21 @@ public class FallTeleOp extends OpMode {
         // Intake: right bumper = clockwise, right trigger = counter-clockwise
         processIntake();
 
-        telemetry.addData("Target lock", targetLocked ? "LOCKED" : "off");
+        servoDoor.update();
+        // Servo door: X = 3 degrees clockwise, Y = 3 degrees counter-clockwise (one step per press)
+        if (gamepad1.x && !lastX) {
+            servoDoor.rotateClockwise();
+        }
+        if (gamepad1.y && !lastY) {
+            servoDoor.rotateCounterClockwise();
+        }
+        lastX = gamepad1.x;
+        lastY = gamepad1.y;
+
+        telemetry.addData("Selected motor", pollen.isNectarSelected() ? "NECTAR" : "POLLEN");
         telemetry.addData("Pollen set speed", pollen.getPollenPower());
         telemetry.addData("Nectar set speed", pollen.getNectarPower());
+        telemetry.addData("Tag distance (in)", "%.1f", limelight.getDistanceInches());
         RobotTelemetry.addMechanisms(telemetry, robot);
         RobotTelemetry.addDrive(telemetry, robot, drive);
         RobotTelemetry.addVision(telemetry, limelight);
@@ -106,6 +95,7 @@ public class FallTeleOp extends OpMode {
 
     private void processOutake() {
         if (gamepad1.left_bumper) {
+            // Limelight does not affect shooter power; pollen is locked at full power.
             pollen.clockwise();
         } else if (gamepad1.left_trigger > Constants.TRIGGER_THRESHOLD) {
             pollen.counterClockwise();
@@ -115,18 +105,25 @@ public class FallTeleOp extends OpMode {
     }
 
     private void adjustOutakePower() {
-        // Speed adjust (one step per press): dpad up/down = pollen, dpad right/left = nectar
+        // Dpad left/right switches between the pollen and nectar motor (only the
+        // selected one runs). Dpad up/down changes the selected motor's power,
+        // one step per press.
+        if ((gamepad1.dpad_right && !lastDpadRight) || (gamepad1.dpad_left && !lastDpadLeft)) {
+            pollen.toggleSelected();
+        }
         if (gamepad1.dpad_up && !lastDpadUp) {
-            pollen.adjustPollenPower(Constants.POWER_STEP);
+            if (pollen.isNectarSelected()) {
+                pollen.adjustNectarPower(Constants.POWER_STEP);
+            } else {
+                pollen.adjustPollenPower(Constants.POWER_STEP);
+            }
         }
         if (gamepad1.dpad_down && !lastDpadDown) {
-            pollen.adjustPollenPower(-Constants.POWER_STEP);
-        }
-        if (gamepad1.dpad_right && !lastDpadRight) {
-            pollen.adjustNectarPower(Constants.POWER_STEP);
-        }
-        if (gamepad1.dpad_left && !lastDpadLeft) {
-            pollen.adjustNectarPower(-Constants.POWER_STEP);
+            if (pollen.isNectarSelected()) {
+                pollen.adjustNectarPower(-Constants.POWER_STEP);
+            } else {
+                pollen.adjustPollenPower(-Constants.POWER_STEP);
+            }
         }
         lastDpadUp = gamepad1.dpad_up;
         lastDpadDown = gamepad1.dpad_down;
