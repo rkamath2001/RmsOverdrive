@@ -9,6 +9,11 @@ import org.firstinspires.ftc.teamcode.Everythingneeded.subsystems.ServoDoor;
  * servo door, keeps shooting for 10 seconds, closes the door, then drives right for 3
  * seconds and backwards for 10 seconds.
  */
+
+/*
+This is a test comment
+ */
+
 @Autonomous(name = "Red Shooter", group = "Competition")
 public class RedShooter extends AutoBase {
 
